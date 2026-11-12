@@ -1,0 +1,11 @@
+# Runtime dependencies of the demo (CPU is enough). Tested with Python 3.11.
+torch>=2.1
+torch_geometric>=2.4
+pybullet>=3.2.5
+numpy>=1.24
+huggingface_hub>=0.23
+pyyaml>=6.0
+pillow>=10.0
+imageio[ffmpeg]>=2.31
+# Optional text channel (the checkpoint was trained with it; the demo also runs without it, see --no-text)
+sentence-transformers>=2.2

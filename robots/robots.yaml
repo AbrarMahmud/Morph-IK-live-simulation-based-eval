@@ -1,0 +1,30 @@
+# Robots offered in the demo.
+#   urdf:  a path relative to the repo root, an absolute path, or pybullet_data://<path> (ships with pybullet)
+#   ee:    end-effector link (optional; default: tool0 / flange / ... / deepest actuated link)
+#   exclude: joints frozen at 0 (names or PyBullet indices), as in the training notebook
+#
+# SEEN / UNSEEN labels are NOT set here: they are read from the checkpoint's config.json
+# (the exact robot lists the journal_main model was trained on and held out).
+#
+# The ABB / KUKA industrial URDFs are the ROS-Industrial support packages used for training. Copy the
+# "urdf-dataset" folder (the Kaggle dataset) to robots/urdf-dataset/ to enable them; missing files are skipped.
+robots:
+  - name: kuka_iiwa
+    urdf: pybullet_data://kuka_iiwa/model.urdf
+  - name: xarm6
+    urdf: pybullet_data://xarm/xarm6_robot.urdf
+  - name: panda
+    urdf: pybullet_data://franka_panda/panda.urdf
+  - name: irb2400
+    urdf: robots/urdf-dataset/abb_irb2400_support/urdf/irb2400.urdf
+  - name: irb5400
+    urdf: robots/urdf-dataset/abb_irb5400_support/urdf/irb5400.urdf
+  - name: irb6640
+    urdf: robots/urdf-dataset/abb_irb6600_support/urdf/irb6640.urdf
+  - name: irb6640_185_280
+    urdf: robots/urdf-dataset/abb_irb6640_support/urdf/irb6640_185_280.urdf
+    exclude: [7, 8]
+  - name: kr16_2
+    urdf: robots/urdf-dataset/kuka_kr16_support/urdf/kr16_2.urdf
+  - name: kr120
+    urdf: robots/urdf-dataset/kuka_kr120_support/urdf/kr120r2500pro.urdf

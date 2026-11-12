@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+videos/
+robots/urdf-dataset/
+.pytest_cache/
+*.egg-info/
