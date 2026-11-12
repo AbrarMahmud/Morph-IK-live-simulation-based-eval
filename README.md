@@ -78,13 +78,9 @@ The self-test runs offline. It checks forward kinematics against PyBullet, the I
 
 ## 3. Point the demo at the model
 
-The demo uses exactly one checkpoint: **`experiments/journal_main_s0/model.pt`** in the Hugging Face repo that the training notebook pushed to. Set the repo once, in any of these ways:
+The demo uses exactly one checkpoint: **`experiments/main_s1/model.pt`** in the Hugging Face repo that the training notebook pushed to. 
 
-- edit `DEFAULT_HF_REPO` in `graphik_demo/config.py` (recommended before publishing), or
-- `export GRAPHIK_HF_REPO=<hf-user>/urdf-graph-ik`, or
-- pass `--repo <hf-user>/urdf-graph-ik` to any command.
-
-If the Hugging Face repo is **private**, log in once with `hf auth login` (older huggingface_hub: `huggingface-cli login`), or set `HF_TOKEN`. The checkpoint downloads on first use and is cached in `~/.cache/huggingface`.
+The models weights are published in Huggigface **(And all the configs are already set to download the open weights before live simulation based evaluator/demonstartor)**
 
 ## 4. Run
 
