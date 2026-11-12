@@ -156,7 +156,7 @@ Each run prints a JSON summary (mean and max error, fraction of frames on target
 ## 6. Industrial robots (ABB / KUKA)
 
 The model was also trained and evaluated on ROS-Industrial URDFs: ABB IRB 2400 / 5400 / 6640 / 6640-185-280 and KUKA KR16-2 / KR120. They aren't redistributed here.
-- Copy the `urdf-dataset` folder (the same layout as the Kaggle dataset used for training) to `robots/urdf-dataset/`. They then appear automatically.
+
 - `robots/robots.yaml` lists every robot; add your own there too.
 - If a URDF's meshes can't be resolved (`package://` paths), that robot is drawn as a stick model generated from its exact kinematics. The IK is unaffected.
 
