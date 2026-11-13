@@ -6,7 +6,7 @@ import numpy as np
 import pybullet as p
 from PIL import Image, ImageDraw, ImageFont
 
-from .render import load_body, set_joints
+from .render import LongExposure, load_body, set_joints
 from .trajectories import build_track
 
 
@@ -18,7 +18,9 @@ def _font(size=14):
 
 
 def record(session, entry, track="figure8", out="videos/demo.mp4", frames=240, size=1.0, scales=None,
-           use_seed=True, polish=True, fps=30, res=640, seed=0):
+           use_seed=True, polish=True, fps=30, res=640, seed=0, exposure=0, exposure_every=5):
+    """exposure > 0 keeps that many translucent copies of earlier steps (long-exposure look) and also saves the
+    final frame as <out>_exposure.png (a still for papers / slides)."""
     entry.link_scales = None if scales is None else np.asarray(scales, dtype=float)
     chain = entry.scaled_chain()
     variant = chain is not entry.chain
@@ -28,6 +30,7 @@ def record(session, entry, track="figure8", out="videos/demo.mp4", frames=240, s
         session.set_robot(chain)
         q0, goals, note = build_track(chain, track, n=frames, size=size, seed=seed)
         session.reset(q0); set_joints(rid, jidx, q0, cid)
+        ghosts = LongExposure(chain, cid, prefer_meshes=kind == "meshes", count=exposure, every=exposure_every) if exposure else None
         R = chain.reach
         dot = p.createVisualShape(p.GEOM_SPHERE, radius=0.008 * R, rgbaColor=[1, 0.1, 0.1, 0.8], physicsClientId=cid)
         trail = p.createVisualShape(p.GEOM_SPHERE, radius=0.006 * R, rgbaColor=[0.1, 0.8, 0.2, 1], physicsClientId=cid)
@@ -44,6 +47,8 @@ def record(session, entry, track="figure8", out="videos/demo.mp4", frames=240, s
             goal = goals[k % len(goals)]
             q, info = session.solve(goal, use_seed=use_seed, polish=polish)
             set_joints(rid, jidx, q, cid); rows.append(info)
+            if ghosts is not None:
+                ghosts.push(q)
             if k % 2 == 0:
                 p.createMultiBody(baseVisualShapeIndex=trail, basePosition=info["ee"][:3, 3].tolist(), physicsClientId=cid)
             img = p.getCameraImage(res, res, view, proj, renderer=p.ER_TINY_RENDERER, physicsClientId=cid)[2]
@@ -56,6 +61,13 @@ def record(session, entry, track="figure8", out="videos/demo.mp4", frames=240, s
             d.text((8, 44), f"frame {k + 1}/{frames}  pos err {info['pos_err_mm']:.3f} mm  rot err {info['rot_err_deg']:.3f} deg  "
                             f"joint step {info['jump_deg']:.1f} deg  solve {info['ms']:.0f} ms", fill=(0, 0, 0), font=font)
             frames_out.append(np.asarray(im))
+        still = None
+        if ghosts is not None and frames_out:
+            still = os.path.splitext(out)[0] + "_exposure.png"
+            os.makedirs(os.path.dirname(os.path.abspath(still)), exist_ok=True)
+            hi = 2 * res                                     # high-resolution still without the text overlay
+            img = p.getCameraImage(hi, hi, view, proj, renderer=p.ER_TINY_RENDERER, physicsClientId=cid)[2]
+            Image.fromarray(np.reshape(np.asarray(img, dtype=np.uint8), (hi, hi, 4))[..., :3]).save(still)
     finally:
         p.disconnect(cid)
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
@@ -71,4 +83,6 @@ def record(session, entry, track="figure8", out="videos/demo.mp4", frames=240, s
     summary = dict(robot=entry.name, status=status, track=note, render=kind, pos_mm_mean=pe.mean(), pos_mm_max=pe.max(),
                    rot_deg_max=re.max(), frac_ok=float(((pe < 5) & (re < 2)).mean()), max_joint_step_deg=js.max(),
                    solve_ms_median=float(np.median(ms)), video=out)
+    if still:
+        summary["exposure_still"] = still
     return summary

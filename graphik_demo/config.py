@@ -2,10 +2,10 @@
 import os
 
 # Hugging Face repo that the training notebook pushed to.
-DEFAULT_HF_REPO = os.environ.get("GRAPHIK_HF_REPO", "iFaz/urdf-graph-ik-journal-main-seed_1")
+DEFAULT_HF_REPO = os.environ.get("GRAPHIK_HF_REPO", "iFaz/urdf-graph-ik-journal-main-seed_5")
 
 # The ONLY checkpoint this demo uses: journal profile, main experiment, seed 0.
-CHECKPOINT_EXPERIMENT = "main_s1"
+CHECKPOINT_EXPERIMENT = "main_s5"
 CHECKPOINT_FILE = f"experiments/{CHECKPOINT_EXPERIMENT}/model.pt"
 CHECKPOINT_CONFIG = f"experiments/{CHECKPOINT_EXPERIMENT}/config.json"
 

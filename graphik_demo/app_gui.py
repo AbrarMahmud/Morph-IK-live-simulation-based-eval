@@ -2,11 +2,13 @@
 
 Right-hand panel (PyBullet "Params"):
   buttons : previous / next robot, previous / next track, random far target (solved with NO seed),
-            apply / reset link lengths
+            apply / reset link lengths, long exposure on/off
   sliders : speed, track size, seed-with-current-joints (0/1), DLS polish (0/1), pause (0/1),
             manual target dx/dy/dz/roll/pitch/yaw, per-link length multipliers
 3-D view : red = target track, green = achieved end-effector trail, RGB axes = target frame,
            HUD text = robot, SEEN/UNSEEN status, track, live position / rotation error and solve time.
+Long exposure: translucent copies of the arm at earlier steps (faint = older, strong = recent) followed by the
+           live arm, like a long-exposure photograph. Sliders set how many copies and how many frames apart.
 """
 import math
 import time
@@ -15,7 +17,7 @@ import numpy as np
 import pybullet as p
 import pybullet_data
 
-from .render import load_body, set_joints
+from .render import LongExposure, load_body, set_joints
 from .trajectories import TRACK_HELP, TRACKS, build_track, manual_goal
 
 
@@ -42,6 +44,7 @@ class DemoGUI:
             p.configureDebugVisualizer(flag, 0)                     # hide the empty camera-preview panels
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         self.scales = None; self.track_seed = 0; self.hud = {}; self.status_t = 0
+        self.exposure_on, self.exposure = False, None
         self.load_robot()
 
     # ------------------------------------------------------------------ setup
@@ -57,6 +60,7 @@ class DemoGUI:
         p.loadURDF("plane.urdf", [0, 0, -0.001])
         self.rid, self.jidx, self.render_kind = load_body(self.chain, self.cid, prefer_meshes=not self.variant)
         self.s.set_robot(self.chain)
+        self.exposure = None                                     # resetSimulation removed the old copies
         self.build_params()
         self.load_track()
 
@@ -85,11 +89,32 @@ class DemoGUI:
             nm = f"link {i} length x  ({'tool' if i == e.chain.dof else f'to joint {i + 1}'}, {L:.3f} m)"
             self.link_sliders.append(p.addUserDebugParameter(nm, 0.5, 1.8, float(cur[i])))
         self.b_apply_links, self.b_reset_links = Button("apply link lengths (UNSEEN variant)"), Button("reset link lengths")
+        self.b_exposure = Button("long exposure ON / OFF (show previous steps)")
+        self.sl_exp_count = p.addUserDebugParameter("long exposure: number of previous steps", 2, 40, 12)
+        self.sl_exp_every = p.addUserDebugParameter("long exposure: frames between steps", 1, 20, 5)
+
+    def exposure_settings(self):
+        return (int(round(p.readUserDebugParameter(self.sl_exp_count))),
+                int(round(p.readUserDebugParameter(self.sl_exp_every))))
+
+    def set_exposure(self, on):
+        self.exposure_on = on
+        if self.exposure is not None:
+            self.exposure.clear(); self.exposure = None
+        if on:
+            n, every = self.exposure_settings()
+            self.exposure = LongExposure(self.chain, self.cid, prefer_meshes=self.render_kind == "meshes",
+                                         count=n, every=every)
+        print(f"[long exposure] {'ON' if on else 'OFF'}")
 
     def load_track(self):
         kind = TRACKS[self.ti]
         self.q0, self.goals, self.note = build_track(self.chain, kind, n=240, size=self.size, seed=self.track_seed)
         self.s.reset(self.q0); set_joints(self.rid, self.jidx, self.q0, self.cid)
+        if self.exposure is not None:
+            self.exposure.clear()                                  # start the exposure afresh on a new track
+        elif self.exposure_on:
+            self.set_exposure(True)                                # robot was reloaded: rebuild the copies
         self.phase, self.prev_ee, self.far_goal = 0.0, None, None
         p.removeAllUserDebugItems(); self.hud = {}
         if kind not in ("manual", "random_poses"):
@@ -130,6 +155,8 @@ class DemoGUI:
             self.scales = np.array([1.0 if sid is None else p.readUserDebugParameter(sid) for sid in self.link_sliders])
             self.load_robot(); return True
         if self.b_reset_links.pressed(): self.scales = None; self.load_robot(); return True
+        if self.b_exposure.pressed(): self.set_exposure(not self.exposure_on)
+        if self.exposure is not None: self.exposure.configure(*self.exposure_settings())
         if self.b_far.pressed():
             q = np.random.default_rng().uniform(self.chain.lower, self.chain.upper)
             self.far_goal = (self.chain.fk_np(q), time.time() + 2.5)
@@ -167,6 +194,8 @@ class DemoGUI:
                 polish = p.readUserDebugParameter(self.sl_polish) > 0.5
                 q, info = self.s.solve(goal, use_seed=use_seed, polish=polish)
                 set_joints(self.rid, self.jidx, q, self.cid)
+                if self.exposure is not None:
+                    self.exposure.push(q)
                 ee = info["ee"][:3, 3]
                 if self.prev_ee is not None and np.linalg.norm(ee - self.prev_ee) < 0.2 * self.chain.reach:
                     p.addUserDebugLine(self.prev_ee, ee, [0.1, 0.75, 0.2], 3.0, lifeTime=8)
@@ -179,7 +208,9 @@ class DemoGUI:
                           (0.0, 0.45, 0.0) if status == "SEEN" else (0.75, 0.25, 0.0))
                 self.text("l1", f"track: {TRACKS[self.ti]} - {TRACK_HELP[TRACKS[self.ti]]}", 1)
                 self.text("l2", f"seed: {'current joints' if use_seed else 'NONE (from scratch)'}  |  "
-                                f"{'GNN + DLS polish' if polish else 'GNN only'}  |  render: {self.render_kind}", 2)
+                                f"{'GNN + DLS polish' if polish else 'GNN only'}  |  render: {self.render_kind}"
+                                + (f"  |  long exposure: {self.exposure.count} steps, every {self.exposure.every} frames"
+                                   if self.exposure is not None else ""), 2)
                 self.text("l3", f"pos err {info['pos_err_mm']:.3f} mm   rot err {info['rot_err_deg']:.3f} deg   "
                                 f"joint step {info['jump_deg']:.1f} deg   solve {info['ms']:.0f} ms"
                                 + ("" if ok else "   (target outside workspace?)"), 3,

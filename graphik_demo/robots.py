@@ -34,7 +34,7 @@ class RobotEntry:
         for i in range(c.dof):
             c.origins[i, :3, 3] = self.chain.origins[i, :3, 3] * scales[i]
         c.tool[:3, 3] = self.chain.tool[:3, 3] * scales[-1]
-        c.name = f"{self.name}*"; c.source = ""
+        c.name = f"{self.name}_variant"; c.source = ""
         return c
 
     @property

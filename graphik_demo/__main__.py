@@ -4,6 +4,7 @@
   python -m graphik_demo gui --robot panda --track circle
   python -m graphik_demo record --robot xarm6 --track figure8 --out videos/xarm6.mp4
   python -m graphik_demo record --robot xarm6 --link-scale 1,1.3,1.3,1,1,1,1     # stretched (unseen) variant
+  python -m graphik_demo record --robot panda --track circle --exposure 14   # long exposure (+ still .png)
   python -m graphik_demo list                  robots and their SEEN / UNSEEN status
   python -m graphik_demo selftest              offline check of the whole pipeline (no download needed)
 """
@@ -46,6 +47,9 @@ def main(argv=None):
     ap.add_argument("--no-polish", action="store_true", help="network output only (no DLS polish)")
     ap.add_argument("--no-text", action="store_true", help="skip the optional text encoder")
     ap.add_argument("--frames", type=int, default=240)
+    ap.add_argument("--exposure", type=int, default=0, help="record: keep N translucent copies of earlier steps "
+                    "(long-exposure look) and save the last frame as a .png still")
+    ap.add_argument("--exposure-every", type=int, default=5, help="record: frames between those copies")
     ap.add_argument("--out", default=None)
     ap.add_argument("--threads", type=int, default=min(4, os.cpu_count() or 1))
     args = ap.parse_args(argv)
@@ -78,7 +82,8 @@ def main(argv=None):
             raise SystemExit(f"{name} needs {entry.n_links} link scales (one per joint offset + tool), got {len(scales)}")
         out = args.out if (args.out and len(targets) == 1) else f"videos/{name}_{args.track}.mp4"
         r = record(session, entry, args.track, out, args.frames, args.size, scales,
-                   use_seed=not args.no_seed, polish=not args.no_polish)
+                   use_seed=not args.no_seed, polish=not args.no_polish,
+                   exposure=args.exposure, exposure_every=args.exposure_every)
         print(json.dumps({k: (round(v, 4) if isinstance(v, float) else v) for k, v in r.items()}))
         results.append(r)
     return 0

@@ -24,6 +24,11 @@ def _align_z(v):
     return np.stack([x, np.cross(z, x), z], 1)
 
 
+def _xml(text):
+    from xml.sax.saxutils import escape
+    return escape(str(text), {'"': "&quot;"})
+
+
 def chain_to_urdf(ch: KinChain, path=None, radius=None):
     """Write a kinematically identical URDF (links drawn as cylinders) for PyBullet / ikpy / TRAC-IK."""
     r = radius or 0.02 * ch.reach
@@ -39,12 +44,12 @@ def chain_to_urdf(ch: KinChain, path=None, radius=None):
         return (f'<link name="{name}"><inertial><mass value="0.1"/><inertia ixx="1e-4" iyy="1e-4" izz="1e-4" '
                 f'ixy="0" ixz="0" iyz="0"/></inertial>{vis}{joint_ball}</link>')
     # link l_i holds the cylinder to the NEXT joint origin (expressed in l_i's frame)
-    parts = [f'<robot name="{ch.name}">', link("l0", ch.origins[0, :3, 3])]
+    parts = [f'<robot name="{_xml(ch.name)}">', link("l0", ch.origins[0, :3, 3])]
     for i in range(ch.dof):
         t_next = ch.origins[i + 1, :3, 3] if i + 1 < ch.dof else ch.tool[:3, 3]
         parts.append(link(f"l{i + 1}", t_next))
         O = ch.origins[i]
-        parts.append(f'<joint name="{ch.joint_names[i]}" type="revolute"><parent link="l{i}"/><child link="l{i + 1}"/>'
+        parts.append(f'<joint name="{_xml(ch.joint_names[i])}" type="revolute"><parent link="l{i}"/><child link="l{i + 1}"/>'
                      f'<origin xyz="{_xyz_str(O[:3, 3])}" rpy="{_rpy_str(O[:3, :3])}"/><axis xyz="{_xyz_str(ch.axes[i])}"/>'
                      f'<limit lower="{ch.lower[i]:.10g}" upper="{ch.upper[i]:.10g}" effort="100" velocity="3"/></joint>')
     parts.append('<link name="ee"><inertial><mass value="0.01"/><inertia ixx="1e-5" iyy="1e-5" izz="1e-5" ixy="0" ixz="0" iyz="0"/></inertial>'
@@ -52,6 +57,7 @@ def chain_to_urdf(ch: KinChain, path=None, radius=None):
     parts.append(f'<joint name="tool_joint" type="fixed"><parent link="l{ch.dof}"/><child link="ee"/>'
                  f'<origin xyz="{_xyz_str(ch.tool[:3, 3])}" rpy="{_rpy_str(ch.tool[:3, :3])}"/></joint></robot>')
     if path is None:
-        path = os.path.join(tempfile.mkdtemp(prefix="urdf_"), f"{ch.name}.urdf")
+        safe = "".join(c if (c.isalnum() or c in "-_.") else "_" for c in ch.name) or "robot"   # valid on Windows too
+        path = os.path.join(tempfile.mkdtemp(prefix="urdf_"), f"{safe}.urdf")
     with open(path, "w") as f: f.write("\n".join(parts))
     return path
